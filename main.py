@@ -1,4 +1,5 @@
 import asyncio
+import re
 from fastapi import FastAPI, Request, Response
 import feedparser
 from feedgen.feed import FeedGenerator
@@ -13,20 +14,25 @@ async def merge_feeds(request: Request):
     urls = request.query_params.getlist('urls[]')
     remove_duplicates = request.query_params.get('removeDuplicates', 'false').lower() == 'true'
     custom_title = request.query_params.get('title', 'Aggregated Feed')
+    exclude_titles = request.query_params.getlist('excludeTitles[]')
 
-    all_entries = await fetch_and_parse_feeds(urls)
+    feeds = await fetch_and_parse_feeds(urls)
+    entries = merge_sources(feeds)
+
+    if exclude_titles:
+        entries = apply_filters(entries, exclude_titles)
 
     if remove_duplicates:
-        all_entries = remove_duplicate_entries(all_entries)
-
-    atom_feed = generate_atom_feed(custom_title, all_entries)
+        entries = remove_duplicate_entries(entries)
+    
+    atom_feed = generate_atom_feed(custom_title, entries)   
     return Response(content=atom_feed, media_type="application/atom+xml")
 
 async def fetch_and_parse_feeds(urls):
     async with aiohttp.ClientSession() as session:
         tasks = [fetch_feed(session, url) for url in urls]
         feeds = await asyncio.gather(*tasks)
-        return [entry for feed in feeds for entry in feed['entries']]
+        return feeds
 
 async def fetch_feed(session, url):
     async with session.get(url) as response:
@@ -35,9 +41,21 @@ async def fetch_feed(session, url):
         feed['href'] = url  # Store the URL in the feed for error reporting
         return feed
     
-    # Sort entries by updated date
-    all_entries.sort(key=lambda entry: entry['updated_parsed'], reverse=True)
-    return all_entries
+    return feed.entries
+
+def merge_sources(feeds):
+    entries = [entry for feed in feeds for entry in feed['entries']]
+    entries.sort(key=lambda entry: entry['updated'], reverse=False)
+    return entries
+
+def apply_filters(entries, exclude_titles):
+        # Filter entries based on exclude_titles
+        exclude_patterns = [re.compile(pattern) for pattern in exclude_titles]
+        filtered_entries = [
+            entry for entry in entries
+            if not any(pattern.match(entry['title']) for pattern in exclude_patterns)
+        ]
+        return filtered_entries
 
 def remove_duplicate_entries(entries):
     def entry_key(entry):
