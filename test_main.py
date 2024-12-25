@@ -113,6 +113,13 @@ def test_filter_entries_by_title(mock_parse):
                     'link': 'http://example.com/feed1/entry2',
                     'summary': 'Summary of Feed 1 Entry 2',
                     'updated': '2023-01-01T00:00:00Z'
+                },
+                {
+                    'id': 'feed-1-entry-3',
+                    'title': 'Feed 1 News Roundup: Entry 3',
+                    'link': 'http://example.com/feed1/entry3',
+                    'summary': 'Summary of Feed 1 Entry 3',
+                    'updated': '2023-01-01T00:00:00Z'
                 }
             ]
         }
@@ -120,12 +127,12 @@ def test_filter_entries_by_title(mock_parse):
 
     response = client.get("/merge", params={
         "urls[]": ["http://example.com/feed1"],
-        "excludeTitles[]": "^Podcast:",
-        "title": "Filtered Feed"
+        "excludeTitles[]": ["^Podcast:", "News Roundup"],
     })
-    
+    print(response.content)
     assert response.text.count("<entry>") == 1
     assert "Podcast: Feed 1 Entry 1" not in response.text
+    assert "Feed 1 News Roundup: Entry 3" not in response.text
     assert "Feed 1 Entry 2" in response.text
 
 @patch('feedparser.parse')

@@ -50,10 +50,9 @@ def merge_sources(feeds):
 
 def apply_filters(entries, exclude_titles):
         # Filter entries based on exclude_titles
-        exclude_patterns = [re.compile(pattern) for pattern in exclude_titles]
         filtered_entries = [
             entry for entry in entries
-            if not any(pattern.match(entry['title']) for pattern in exclude_patterns)
+            if not any([re.search(pattern, entry['title']) for pattern in exclude_titles])
         ]
         return filtered_entries
 
