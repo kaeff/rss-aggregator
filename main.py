@@ -14,13 +14,14 @@ async def merge_feeds(request: Request):
     urls = request.query_params.getlist('urls[]')
     remove_duplicates = request.query_params.get('removeDuplicates', 'false').lower() == 'true'
     custom_title = request.query_params.get('title', 'Aggregated Feed')
+    include_titles = request.query_params.getlist('includeTitles[]')
     exclude_titles = request.query_params.getlist('excludeTitles[]')
 
     feeds = await fetch_and_parse_feeds(urls)
     entries = merge_sources(feeds)
 
-    if exclude_titles:
-        entries = apply_filters(entries, exclude_titles)
+    if exclude_titles or include_titles:
+        entries = apply_filters(entries, include_titles, exclude_titles)
 
     if remove_duplicates:
         entries = remove_duplicate_entries(entries)
@@ -48,13 +49,12 @@ def merge_sources(feeds):
     entries.sort(key=lambda entry: entry['updated'], reverse=False)
     return entries
 
-def apply_filters(entries, exclude_titles):
-        # Filter entries based on exclude_titles
-        filtered_entries = [
-            entry for entry in entries
-            if not any([re.search(pattern, entry['title']) for pattern in exclude_titles])
-        ]
-        return filtered_entries
+def apply_filters(entries, include_titles, exclude_titles):
+    if include_titles:
+        return [entry for entry in entries if any(re.search(pattern, entry['title']) for pattern in include_titles)]
+    if exclude_titles:
+        return [entry for entry in entries if not any(re.search(pattern, entry['title']) for pattern in exclude_titles)]
+    return entries
 
 def remove_duplicate_entries(entries):
     def entry_key(entry):

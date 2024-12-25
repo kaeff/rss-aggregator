@@ -136,6 +136,39 @@ def test_filter_entries_by_title(mock_parse):
     assert "Feed 1 Entry 2" in response.text
 
 @patch('feedparser.parse')
+def test_filter_entries_by_title_include(mock_parse):
+    mock_parse.side_effect = [
+        {
+            'feed': {'title': 'Feed 1'},
+            'entries': [
+                {
+                    'id': 'feed-1-entry-1',
+                    'title': 'This is an Included Entry',
+                    'link': 'http://example.com/feed1/entry1',
+                    'summary': 'Summary of Feed 1 Entry 1',
+                    'updated': '2023-01-01T00:00:00Z'
+                },
+                {
+                    'id': 'feed-1-entry-2',
+                    'title': 'Any other article is excluded',
+                    'link': 'http://example.com/feed1/entry2',
+                    'summary': 'Summary of Feed 1 Entry 2',
+                    'updated': '2023-01-01T00:00:00Z'
+                }
+            ]
+        }
+    ]
+
+    response = client.get("/merge", params={
+        "urls[]": ["http://example.com/feed1"],
+        "includeTitles[]": ["Included"],
+        "excludeTitles[]": ["Disregarded if includeTitles is set"],
+    })
+    print(response.content)
+    assert response.text.count("<entry>") == 1
+    assert "Summary of Feed 1 Entry 1" in response.text
+
+@patch('feedparser.parse')
 def test_merged_entries_sorted_by_updated(mock_parse):
     mock_parse.side_effect = [
         {
